@@ -508,7 +508,7 @@ function filterHtml(extra=""){
 }
 document.addEventListener("change",e=>{
   const f=e.target.dataset?.f;if(!f)return;
-  prefs[f]=e.target.type==="checkbox"?e.target.checked:e.target.value;savePrefs();renderAll();
+  prefs[f]=e.target.type==="checkbox"?e.target.checked:e.target.value;savePrefs();if(f!=="grade")renderAll();
 });
 
 /* ============ 集計 ============ */
@@ -717,7 +717,7 @@ function renderMem(){
     <span class="lbl">部員を登録する</span>
     <div class="add">
       <input type="text" id="mName" maxlength="12" placeholder="名字" aria-label="名前">
-      <select id="mGrade" aria-label="学年"><option value="1">1年</option><option value="2" selected>2年</option><option value="3">3年</option><option value="">なし</option></select>
+      <select id="mGrade" data-f="grade" aria-label="学年">${[["1","1年"],["2","2年"],["3","3年"],["","なし"]].map(([v,l])=>`<option value="${v}" ${(prefs.grade??"2")===v?"selected":""}>${l}</option>`).join("")}</select>
       <button class="primary" data-act="addMem">登録</button>
     </div>
     <p class="hint">名字で登録します。同じ名字の人がいるときは「佐藤ゆ」のように名の1字を足してください。</p>
@@ -773,7 +773,7 @@ $("tab-mem").addEventListener("click",async e=>{
   else if(b.dataset.act==="rename"){const n=$("clubRename").value.trim();if(n)put("meta","name",n),toast("変えました")}
   else if(b.dataset.act==="leave")leave();
 });
-$("tab-mem").addEventListener("keydown",e=>{if(e.target.id==="mName"&&e.key==="Enter")document.querySelector('[data-act="addMem"]').click()});
+$("tab-mem").addEventListener("keydown",e=>{if(e.target.id==="mName"&&e.key==="Enter"&&!e.isComposing&&e.keyCode!==229)document.querySelector('[data-act="addMem"]').click()});
 
 /* ============ 起動 ============ */
 renderGate();
