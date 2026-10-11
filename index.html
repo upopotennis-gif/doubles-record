@@ -70,7 +70,15 @@ header.top .club{display:block;font-size:14px;color:var(--muted);font-weight:400
 /* 入口 */
 .gate h2{font-size:18px;margin:0 0 8px}
 .gate .code{font-size:22px;letter-spacing:.15em;text-align:center;font-variant-numeric:tabular-nums}
-.recent{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.books{display:flex;flex-direction:column;gap:8px}
+.books button{text-align:left;display:flex;align-items:center;gap:10px;min-height:56px;font-weight:700}
+.books button small{margin-left:auto;font-weight:400;color:var(--muted);font-size:14px}
+.sum::-webkit-details-marker{display:none}
+.sum{list-style:none}
+.sum::after{content:"＋";margin-left:auto;color:var(--navy);font-size:20px}
+details[open] .sum::after{content:"－"}
+.sum{cursor:pointer;font-weight:700;font-size:17px;min-height:44px;display:flex;align-items:center}
+header.top .sw{flex:none;font-size:14px;padding:6px 10px}
 
 /* 下のタブ */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
@@ -166,6 +174,7 @@ table.tb th{font-size:14px;color:var(--muted);font-weight:400}
   <header class="top">
     <div class="mark" aria-hidden="true"></div>
     <h1>ダブルス戦績ノート<span class="club" id="clubName"></span></h1>
+    <button class="sw" id="swBtn" hidden>記録帳を<br>切り替え</button>
   </header>
   <div class="conn" id="connMsg" hidden></div>
 
@@ -173,25 +182,32 @@ table.tb th{font-size:14px;color:var(--muted);font-weight:400}
   <p class="hint" id="loading" style="text-align:center;padding:40px 0">読み込んでいます…</p>
   <section id="gate" class="gate" hidden>
     <div class="panel">
-      <h2>部の番号で開く</h2>
-      <p class="hint" style="margin-top:0">顧問の先生から聞いた6けたの番号を入れてください。</p>
+      <h2>記録帳をえらぶ</h2>
+      <div class="books" id="recent"></div>
+      <p class="msg" id="openMsg" hidden></p>
+    </div>
+    <details class="panel">
+      <summary class="sum">番号で開く</summary>
+      <p class="hint">記録帳の6けたの番号を入れます。一度開くと、このスマホでは上の一覧に出ます。</p>
       <div class="row" style="margin-top:10px">
-        <input type="tel" id="codeIn" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="off" aria-label="部の番号">
+        <input type="tel" id="codeIn" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="off" aria-label="記録帳の番号">
         <button class="primary" id="openBtn" style="flex:none">開く</button>
       </div>
-      <p class="msg" id="openMsg" hidden></p>
-      <div class="recent" id="recent"></div>
-    </div>
-    <div class="panel">
-      <h2>はじめて使う（先生）</h2>
-      <p class="hint" style="margin-top:0">部の記録帳を作ると、6けたの「部の番号」ができます。番号を部員に伝えれば、全員で記録・確認できます。</p>
-      <label class="lbl" for="clubIn">部の名前</label>
-      <input type="text" id="clubIn" placeholder="例：ソフトテニス部（男子）" maxlength="30">
-      <button class="primary wide" id="createBtn" style="margin-top:12px">部の記録帳を作る</button>
+    </details>
+    <details class="panel">
+      <summary class="sum">新しい記録帳を作る（先生）</summary>
+      <span class="lbl" style="margin-top:12px">使い方</span>
+      <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <button data-kind="club" aria-pressed="false">部で使う</button>
+        <button data-kind="personal" aria-pressed="true">自分用</button>
+      </div>
+      <p class="hint" id="kindHint"></p>
+      <label class="lbl" for="clubIn">記録帳の名前</label>
+      <input type="text" id="clubIn" placeholder="例：自分の試合" maxlength="30">
+      <button class="primary wide" id="createBtn" style="margin-top:12px">記録帳を作る</button>
       <p class="msg" id="createMsg" hidden></p>
       <button class="link" id="localBtn" style="margin-top:6px">番号を使わず、この端末だけで試す</button>
-    </div>
-    <p class="hint">記録は部の番号を知っている人だけが見られます。番号は部の外に出さないでください。</p>
+    </details>
   </section>
 
   <!-- 本体 -->
@@ -225,9 +241,14 @@ const firebaseConfig={
   messagingSenderId:'39499958848',
   appId:'1:39499958848:web:1a8ba8004dc4611c1cada5'
 };
+const HOME="957596"; // 部の記録帳（市立川崎）
 const LS_LOCAL="doubles-record-local", LS_LAST="doubles-record-last", LS_RECENT="doubles-record-recent", LS_PREFS="doubles-record-prefs";
-const TYPES={bu:"部内",ren:"他校",tai:"大会"};
-const TYPE_LONG={bu:"部内の練習試合",ren:"他校との練習試合",tai:"大会"};
+// 「自分用」の記録帳（meta.kind="personal"）は呼び名を変える
+const P=()=>S?.meta?.kind==="personal";
+const TY=()=>P()?{bu:"メンバーどうし",ren:"その他",tai:"大会"}:{bu:"部内",ren:"他校",tai:"大会"};
+const TYL=()=>P()?{bu:"メンバーどうしの試合",ren:"練習試合",tai:"大会"}:{bu:"部内の練習試合",ren:"他校との練習試合",tai:"大会"};
+const MEM=()=>P()?"メンバー":"部員";
+const TYPES=new Proxy({},{get:(_,k)=>TY()[k]}), TYPE_LONG=new Proxy({},{get:(_,k)=>TYL()[k]});
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -267,7 +288,7 @@ async function loadFirebase(){
   return FB;
 }
 const refFor=c=>FB.doc(FB.db,"events","dr-"+c,"state","record");
-const blankDoc=name=>({meta:{name:name||"",createdAt:Date.now()},members:{},matches:{}});
+const blankDoc=(name,kind)=>({meta:{name:name||"",kind:kind||"club",createdAt:Date.now()},members:{},matches:{}});
 
 // field: "members" | "matches" | "meta"、key、値（null で削除）
 function put(field,key,val){
@@ -278,8 +299,8 @@ function put(field,key,val){
     .catch(e=>showConn("保存できませんでした。通信を確かめて、もう一度入れてください。（"+e.code+"）"));
 }
 
-function remember(c,name){
-  const r=lsGet(LS_RECENT,[]).filter(x=>x.code!==c);r.unshift({code:c,name:name||""});lsSet(LS_RECENT,r.slice(0,4));
+function remember(c,name,kind){
+  const r=lsGet(LS_RECENT,[]).filter(x=>x.code!==c);r.unshift({code:c,name:name||"",kind:kind||"club"});lsSet(LS_RECENT,r.slice(0,6));
 }
 function gateMsg(id,t){$("loading").hidden=true;$("gate").hidden=false;$(id).textContent=t;$(id).hidden=false}
 
@@ -291,12 +312,12 @@ async function openCloud(c){
   let first=true;
   unsub=FB.onSnapshot(docRef,snap=>{
     if(!snap.exists()){
-      if(first){lsSet(LS_LAST,null);return gateMsg("openMsg",`部の番号 ${c} は見つかりません。番号を確かめてください。`)}
+      if(first){lsSet(LS_LAST,null);return gateMsg("openMsg",`番号 ${c} の記録帳は見つかりません。番号を確かめてください。`)}
       toast("この記録帳は削除されました");return leave();
     }
     const d=snap.data();
     S={meta:d.meta||{},members:d.members||{},matches:d.matches||{}};
-    if(first){first=false;mode="cloud";code=c;lsSet(LS_LAST,c);remember(c,S.meta.name);showApp()}
+    if(first){first=false;mode="cloud";code=c;lsSet(LS_LAST,c);remember(c,S.meta.name,S.meta.kind);showApp()}
     else renderAll();
     showConn("");
   },e=>{
@@ -304,7 +325,7 @@ async function openCloud(c){
     else showConn("接続が切れました。ページを開き直してください。（"+e.code+"）");
   });
 }
-async function createCloud(name){
+async function createCloud(name,kind){
   try{await loadFirebase()}catch(e){return gateMsg("createMsg","共有データに接続できませんでした。インターネット接続を確かめてください。")}
   let c=null;
   for(let t=0;t<8;t++){
@@ -313,7 +334,7 @@ async function createCloud(name){
     if(s&&!s.exists()){c=cand;break}
   }
   if(!c)return gateMsg("createMsg","番号を用意できませんでした。もう一度お試しください。");
-  try{await FB.setDoc(refFor(c),blankDoc(name))}catch(e){return gateMsg("createMsg","作れませんでした。（"+e.code+"）")}
+  try{await FB.setDoc(refFor(c),blankDoc(name,kind))}catch(e){return gateMsg("createMsg","作れませんでした。（"+e.code+"）")}
   prefs.tab="mem";savePrefs();
   openCloud(c);
 }
@@ -324,22 +345,32 @@ function openLocal(){
 }
 function leave(){
   if(unsub)unsub();unsub=null;S=null;mode=null;code=null;lsSet(LS_LAST,null);
-  $("app").hidden=true;$("tabs").hidden=true;$("gate").hidden=false;$("clubName").textContent="";closeSheet();renderGate();
+  $("app").hidden=true;$("tabs").hidden=true;$("swBtn").hidden=true;$("loading").hidden=true;$("gate").hidden=false;$("clubName").textContent="";closeSheet();renderGate();
 }
 
 /* ============ 入口 ============ */
 function renderGate(){
-  const r=lsGet(LS_RECENT,[]);
-  $("recent").innerHTML=r.map(x=>`<button data-open="${esc(x.code)}">${esc(x.name||"部")}（${esc(x.code)}）</button>`).join("");
+  let r=lsGet(LS_RECENT,[]);
+  if(!r.some(x=>x.code===HOME))r=[...r,{code:HOME,name:"市立川崎"}];
+  r.sort((a,b)=>(b.code===HOME)-(a.code===HOME));
+  $("recent").innerHTML=r.map(x=>`<button data-open="${esc(x.code)}">${x.kind==="personal"?"👤":"🎾"} ${esc(x.name||"記録帳")}<small>${x.kind==="personal"?"自分用":"部"}</small></button>`).join("");
+  kindHint();
 }
+let newKind="personal";
+function kindHint(){
+  document.querySelectorAll("[data-kind]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.kind===newKind));
+  $("kindHint").textContent=newKind==="personal"?"自分の試合を記録します。番号を教えない限り、部員には見えません。":"部員みんなで記録します。番号かページのアドレスを部員に伝えます。";
+}
+document.querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>{newKind=b.dataset.kind;kindHint()});
+$("swBtn").onclick=leave;
 $("openBtn").onclick=()=>{const c=$("codeIn").value.replace(/\D/g,"");if(c.length!==6)return gateMsg("openMsg","6けたの数字を入れてください。");openCloud(c)};
 $("codeIn").onkeydown=e=>{if(e.key==="Enter")$("openBtn").click()};
-$("recent").onclick=e=>{const b=e.target.closest("[data-open]");if(b)openCloud(b.dataset.open)};
-$("createBtn").onclick=()=>{const n=$("clubIn").value.trim();if(!n)return gateMsg("createMsg","部の名前を入れてください。");$("createMsg").hidden=true;createCloud(n)};
+$("recent").onclick=e=>{const b=e.target.closest("[data-open]");if(b){$("gate").hidden=true;$("loading").hidden=false;openCloud(b.dataset.open)}};
+$("createBtn").onclick=()=>{const n=$("clubIn").value.trim();if(!n)return gateMsg("createMsg","記録帳の名前を入れてください。");$("createMsg").hidden=true;createCloud(n,newKind)};
 $("localBtn").onclick=openLocal;
 
 function showApp(){
-  $("loading").hidden=true;$("gate").hidden=true;$("app").hidden=false;$("tabs").hidden=false;
+  $("loading").hidden=true;$("gate").hidden=true;$("app").hidden=false;$("tabs").hidden=false;$("swBtn").hidden=false;
   F=newForm();
   setTab(prefs.tab);
 }
@@ -355,14 +386,15 @@ $("tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.datas
 
 function renderAll(){
   if(!S)return;
-  $("clubName").textContent=(S.meta.name||"")+(mode==="local"?"・この端末だけ":"");
+  $("clubName").textContent=(S.meta.name||"")+(mode==="local"?"・この端末だけ":P()?"・自分用":"");
+  document.querySelector('[data-tab="mem"]').lastChild.textContent=P()?"メンバー":"部員・共有";
   const t=prefs.tab;
   if(t==="rec")renderRec();else if(t==="list")renderList();else if(t==="ind")renderInd();else if(t==="pair")renderPair();else renderMem();
   if(openSheetFn)openSheetFn();
 }
 
 /* ============ 部員の名前 ============ */
-const nm=id=>S.members[id]?.n||"（消した部員）";
+const nm=id=>S.members[id]?.n||"（消した"+MEM()+"）";
 const pairName=ids=>ids.map(nm).join("・");
 function membersSorted(includeOut){
   return Object.entries(S.members).filter(([,m])=>includeOut||!m.out)
@@ -370,7 +402,7 @@ function membersSorted(includeOut){
 }
 function memberChips(sel,taken,act){
   const list=membersSorted(false);
-  if(!list.length)return `<p class="hint">部員がまだいません。「部員・共有」で登録してください。</p>`;
+  if(!list.length)return `<p class="hint">${MEM()}がまだいません。「${MEM()}・共有」で登録してください。</p>`;
   const groups={};
   for(const [id,m] of list)(groups[m.g||""]??=[]).push([id,m]);
   return Object.keys(groups).sort((a,b)=>(a||"9").localeCompare(b||"9")).map(g=>
@@ -393,12 +425,12 @@ function renderRec(){
   $("tab-rec").innerHTML=`${editing}
   <div class="panel">
     <span class="lbl">試合の種類</span>
-    <div class="seg">${Object.keys(TYPES).map(k=>`<button data-type="${k}" aria-pressed="${F.t===k}">${{bu:"部内",ren:"他校と",tai:"大会"}[k]}<br><small>${k==="tai"?"公式戦":"練習試合"}</small></button>`).join("")}</div>
+    <div class="seg">${Object.keys(TY()).map(k=>`<button data-type="${k}" aria-pressed="${F.t===k}">${(P()?{bu:"メンバー",ren:"その他と",tai:"大会"}:{bu:"部内",ren:"他校と",tai:"大会"})[k]}<br><small>${k==="tai"?"公式戦":k==="bu"&&P()?"どうし":"練習試合"}</small></button>`).join("")}</div>
     <label class="lbl" for="fDate">日付</label>
     <input type="date" id="fDate" value="${esc(F.d)}">
     ${internal?"":`
-    <label class="lbl" for="fEv">${F.t==="tai"?"大会名":"相手の学校"}</label>
-    <input type="text" id="fEv" list="evList" value="${esc(F.ev)}" maxlength="40" placeholder="${F.t==="tai"?"例：新人戦 地区予選":"例：〇〇高校"}">
+    <label class="lbl" for="fEv">${F.t==="tai"?"大会名":P()?"相手（チーム・場所など）":"相手の学校"}</label>
+    <input type="text" id="fEv" list="evList" value="${esc(F.ev)}" maxlength="40" placeholder="${F.t==="tai"?"例：新人戦 地区予選":P()?"例：〇〇クラブ":"例：〇〇高校"}">
     <datalist id="evList">${evList.map(v=>`<option value="${esc(v)}">`).join("")}</datalist>
     <label class="lbl" for="fBo">相手の名前（なくてもよい）</label>
     <input type="text" id="fBo" value="${esc(F.bo)}" maxlength="40" placeholder="${F.t==="tai"?"例：〇〇高・山田／川口":"例：山田／川口"}">`}
@@ -409,7 +441,7 @@ function renderRec(){
     ${memberChips(F.a,F.b,"pa")}
   </div>
   ${internal?`<div class="panel">
-    <span class="lbl">相手のペア（部員から2人）</span>
+    <span class="lbl">相手のペア（${MEM()}から2人）</span>
     <div class="pairbox">${F.b.length?esc(pairName(F.b)):`<span class="empty">まだ選んでいません</span>`}${F.b.length?`<button data-act="clrB">やり直す</button>`:""}</div>
     ${memberChips(F.b,F.a,"pb")}
   </div>`:""}
@@ -505,7 +537,7 @@ function inFilter(m){
 function filterHtml(extra=""){
   return `<div class="filters">
     <select data-f="period" aria-label="期間">${periods().map(([v,l])=>`<option value="${v}" ${prefs.period===v?"selected":""}>${esc(l)}</option>`).join("")}</select>
-    <select data-f="type" aria-label="試合の種類">${[["all","すべての試合"],["prac","練習試合（部内＋他校）"],["bu","部内の練習試合"],["ren","他校との練習試合"],["tai","大会"]].map(([v,l])=>`<option value="${v}" ${prefs.type===v?"selected":""}>${l}</option>`).join("")}</select>
+    <select data-f="type" aria-label="試合の種類">${[["all","すべての試合"],["prac","練習試合（大会以外）"],["bu",TYPE_LONG.bu],["ren",TYPE_LONG.ren],["tai","大会"]].map(([v,l])=>`<option value="${v}" ${prefs.type===v?"selected":""}>${l}</option>`).join("")}</select>
     ${extra}</div>`;
 }
 document.addEventListener("change",e=>{
@@ -580,7 +612,7 @@ function renderPair(){
   ${filterHtml(`<label class="minrow full"><input type="checkbox" data-f="min" ${prefs.min?"checked":""}>3試合以上のペアだけ</label>
   <label class="minrow full"><input type="checkbox" data-f="showOut" ${prefs.showOut?"checked":""}>引退・退部した人のペアも出す</label>`)}
   ${html||`<p class="empty-note">この条件の試合はまだありません。</p>`}
-  <p class="hint">部内の試合は、勝ったペア・負けたペアの両方に数えます。</p>`;
+  <p class="hint">${TYPE_LONG.bu}は、勝ったペア・負けたペアの両方に数えます。</p>`;
 }
 $("tab-pair").addEventListener("click",e=>{const b=e.target.closest("[data-q]");if(b)openPairSheet(b.dataset.q)});
 
@@ -657,7 +689,7 @@ function kpi(r){
   return `<div class="kpi"><div><b>${pct(r.w,r.pl)}%</b><span>勝率</span></div><div><b>${r.w}-${r.pl-r.w}</b><span>勝-敗</span></div><div><b>${pct(r.gf,r.gf+r.ga)}%</b><span>ゲーム</span></div></div>`;
 }
 function typeTable(filterBase){
-  const rows=[["bu","部内"],["ren","他校"],["tai","大会"]].map(([t,l])=>{
+  const rows=[["bu",TYPES.bu],["ren",TYPES.ren],["tai","大会"]].map(([t,l])=>{
     const r=blank();
     for(const m of Object.values(S.matches)){if(!filterBase(m)||m.t!==t)continue;const s=sideOf(m);if(s)add(r,s.win,s.gf,s.ga,"")}
     return r.pl?`<tr><td>${l}</td><td>${r.pl}</td><td>${r.w}-${r.pl-r.w}</td><td>${pct(r.w,r.pl)}%</td></tr>`:"";
@@ -702,7 +734,7 @@ function openPairSheet(key){
     sheet(`<h3>${esc(pairName(ids))}</h3><p class="hint" style="margin:0">${esc(periods().find(p=>p[0]===prefs.period)?.[1]||"")}・${r.pl}試合</p>
       ${kpi(r)}
       ${typeTable(inFilter)}
-      ${vsRows.length?`<span class="lbl">部内の相手ペアべつ</span><table class="tb"><tr><th>相手</th><th>試合</th><th>勝-敗</th><th>勝率</th></tr>
+      ${vsRows.length?`<span class="lbl">${TYPES.bu}の相手ペアべつ</span><table class="tb"><tr><th>相手</th><th>試合</th><th>勝-敗</th><th>勝率</th></tr>
       ${vsRows.map(([k,x])=>`<tr><td>${esc(k)}</td><td>${x.pl}</td><td>${x.w}-${x.pl-x.w}</td><td>${pct(x.w,x.pl)}%</td></tr>`).join("")}</table>`:""}
       <span class="lbl">最近の試合</span>${recentList(r.last)}`);
   };
@@ -713,10 +745,10 @@ function openPairSheet(key){
 function renderMem(){
   const list=membersSorted(true);
   const cnt={};for(const m of Object.values(S.matches))for(const p of [...m.a,...(m.b||[])])cnt[p]=(cnt[p]||0)+1;
-  const url=location.origin+location.pathname;
+  const url=location.origin+location.pathname+(P()?"?c="+code:"");
   $("tab-mem").innerHTML=`
   <div class="panel">
-    <span class="lbl">部員を登録する</span>
+    <span class="lbl">${MEM()}を登録する</span>
     <div class="add">
       <input type="text" id="mName" maxlength="12" placeholder="名字" aria-label="名前">
       <select id="mGrade" data-f="grade" aria-label="学年">${[["1","1年"],["2","2年"],["3","3年"],["","なし"]].map(([v,l])=>`<option value="${v}" ${(prefs.grade??"2")===v?"selected":""}>${l}</option>`).join("")}</select>
@@ -726,7 +758,7 @@ function renderMem(){
     <p class="msg" id="memMsg" hidden></p>
   </div>
   <div class="panel">
-    <span class="lbl">部員（${list.filter(([,m])=>!m.out).length}人${list.some(([,m])=>m.out)?`・引退/退部 ${list.filter(([,m])=>m.out).length}人`:""}）</span>
+    <span class="lbl">${MEM()}（${list.filter(([,m])=>!m.out).length}人${list.some(([,m])=>m.out)?`・引退/退部 ${list.filter(([,m])=>m.out).length}人`:""}）</span>
     ${list.map(([id,m])=>`<div class="mem${m.out?" out":""}"><span class="n">${esc(m.n)}<small>${m.g?m.g+"年":""}${m.out?"・引退/退部":""}・${cnt[id]||0}試合</small></span>
       <button data-ren="${id}">名前</button>
       <button data-out="${id}">${m.out?"もどす":"引退"}</button>
@@ -734,13 +766,13 @@ function renderMem(){
     <p class="hint">引退・退部にすると、記録するときの名前一覧から消えます（成績は残ります）。試合の記録がある人は消せません。</p>
   </div>
   ${mode==="cloud"?`<div class="panel">
-    <span class="lbl">部員に伝える</span>
+    <span class="lbl">${P()?"ほかのスマホで開く":MEM()+"に伝える"}</span>
     <div class="qr" id="qr"></div>
     <button class="wide" data-act="copy">ページのアドレスをコピー</button>
-    <p class="hint">このページのアドレスを知っている人は、だれでも見る・記録する・直すことができます。部の外の人には教えないでください。</p>
+    <p class="hint">${P()?`自分用の記録帳の番号は <b>${code}</b> です。ほかのスマホでは「記録帳を切り替え」→「番号で開く」で入れてください。番号を部員に教えない限り、部員には見えません。`:"このページのアドレスを知っている人は、だれでも見る・記録する・直すことができます。部の外の人には教えないでください。"}</p>
   </div>`:`<div class="panel"><span class="lbl">この端末だけで試しています</span><p class="hint" style="margin-top:0">記録はこのスマホ・パソコンの中だけにあります。部で共有するには、入口で「部の記録帳を作る」を押してください。</p></div>`}
   <div class="panel">
-    <label class="lbl" for="clubRename">部の名前</label>
+    <label class="lbl" for="clubRename">記録帳の名前</label>
     <div class="row"><input type="text" id="clubRename" value="${esc(S.meta.name||"")}" maxlength="30"><button data-act="rename" style="flex:none">変える</button></div>
   </div>`;
   if(mode==="cloud"&&window.QRCode){new QRCode($("qr"),{text:url,width:180,height:180,correctLevel:QRCode.CorrectLevel.M})}
@@ -766,7 +798,7 @@ $("tab-mem").addEventListener("click",async e=>{
   else if(b.dataset.out){const id=b.dataset.out,m=S.members[id];put("members",id,{...m,out:!m.out})}
   else if(b.dataset.del){const id=b.dataset.del;if(confirm(S.members[id].n+" を消します。よろしいですか？"))put("members",id,null)}
   else if(b.dataset.act==="copy"){
-    const url=location.origin+location.pathname;
+    const url=location.origin+location.pathname+(P()?"?c="+code:"");
     try{await navigator.clipboard.writeText(url);toast("コピーしました")}catch(err){prompt("このアドレスをコピーしてください",url)}
   }
   else if(b.dataset.act==="rename"){const n=$("clubRename").value.trim();if(n)put("meta","name",n),toast("変えました")}
@@ -776,10 +808,10 @@ $("tab-mem").addEventListener("keydown",e=>{if(e.target.id==="mName"&&e.key==="E
 
 /* ============ 起動 ============ */
 renderGate();
-// 自分の部だけで使うので、入口の番号入力をとばして部の記録帳を直接開く（?c=番号 があればそちら）
-const HOME="957596";
-const qc=new URLSearchParams(location.search).get("c");
-openCloud(qc&&/^\d{6}$/.test(qc)?qc:HOME);
+// 入口の番号入力はとばす：?c=番号 → このスマホで最後に開いた記録帳 → 部の記録帳 の順に開く
+const qc=new URLSearchParams(location.search).get("c"), last=lsGet(LS_LAST,null);
+if(last==="local")openLocal();
+else openCloud(qc&&/^\d{6}$/.test(qc)?qc:/^\d{6}$/.test(last||"")?last:HOME);
 </script>
 </body>
 </html>
