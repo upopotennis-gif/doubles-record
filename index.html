@@ -386,7 +386,7 @@ $("tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(b)setTab(b.datas
 
 function renderAll(){
   if(!S)return;
-  $("clubName").textContent=(S.meta.name||"")+(mode==="local"?"・この端末だけ":P()?"・自分用":"");
+  $("clubName").textContent=(S.meta.name||"")+(mode==="local"?"・この端末だけ":(P()?"・自分用":"")+"・番号 "+code);
   document.querySelector('[data-tab="mem"]').lastChild.textContent=P()?"メンバー":"部員・共有";
   const t=prefs.tab;
   if(t==="rec")renderRec();else if(t==="list")renderList();else if(t==="ind")renderInd();else if(t==="pair")renderPair();else renderMem();
@@ -745,7 +745,7 @@ function openPairSheet(key){
 function renderMem(){
   const list=membersSorted(true);
   const cnt={};for(const m of Object.values(S.matches))for(const p of [...m.a,...(m.b||[])])cnt[p]=(cnt[p]||0)+1;
-  const url=location.origin+location.pathname+(P()?"?c="+code:"");
+  const url=location.origin+location.pathname+"?c="+code;
   $("tab-mem").innerHTML=`
   <div class="panel">
     <span class="lbl">${MEM()}を登録する</span>
@@ -767,9 +767,11 @@ function renderMem(){
   </div>
   ${mode==="cloud"?`<div class="panel">
     <span class="lbl">${P()?"ほかのスマホで開く":MEM()+"に伝える"}</span>
+    <div class="big-code">${code}</div>
+    <p class="hint" style="text-align:center;margin-top:0">この記録帳の番号（「記録帳を切り替え」→「番号で開く」で入れる）</p>
     <div class="qr" id="qr"></div>
     <button class="wide" data-act="copy">ページのアドレスをコピー</button>
-    <p class="hint">${P()?`自分用の記録帳の番号は <b>${code}</b> です。ほかのスマホでは「記録帳を切り替え」→「番号で開く」で入れてください。番号を部員に教えない限り、部員には見えません。`:"このページのアドレスを知っている人は、だれでも見る・記録する・直すことができます。部の外の人には教えないでください。"}</p>
+    <p class="hint">${P()?`QRコードかコピーしたアドレスで、ほかのスマホからこの記録帳を開けます。番号を部員に教えない限り、部員には見えません。`:"QRコードかコピーしたアドレスで、この記録帳が直接開きます。番号やアドレスを知っている人は、だれでも見る・記録する・直すことができます。部の外の人には教えないでください。"}</p>
   </div>`:`<div class="panel"><span class="lbl">この端末だけで試しています</span><p class="hint" style="margin-top:0">記録はこのスマホ・パソコンの中だけにあります。部で共有するには、入口で「部の記録帳を作る」を押してください。</p></div>`}
   <div class="panel">
     <label class="lbl" for="clubRename">記録帳の名前</label>
@@ -798,7 +800,7 @@ $("tab-mem").addEventListener("click",async e=>{
   else if(b.dataset.out){const id=b.dataset.out,m=S.members[id];put("members",id,{...m,out:!m.out})}
   else if(b.dataset.del){const id=b.dataset.del;if(confirm(S.members[id].n+" を消します。よろしいですか？"))put("members",id,null)}
   else if(b.dataset.act==="copy"){
-    const url=location.origin+location.pathname+(P()?"?c="+code:"");
+    const url=location.origin+location.pathname+"?c="+code;
     try{await navigator.clipboard.writeText(url);toast("コピーしました")}catch(err){prompt("このアドレスをコピーしてください",url)}
   }
   else if(b.dataset.act==="rename"){const n=$("clubRename").value.trim();if(n)put("meta","name",n),toast("変えました")}
