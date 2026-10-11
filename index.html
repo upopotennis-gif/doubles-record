@@ -186,7 +186,7 @@ table.tb th{font-size:14px;color:var(--muted);font-weight:400}
       <div class="books" id="recent"></div>
       <p class="msg" id="openMsg" hidden></p>
     </div>
-    <details class="panel">
+    <details class="panel" id="openDetails">
       <summary class="sum">番号で開く</summary>
       <p class="hint">記録帳の6けたの番号を入れます。一度開くと、このスマホでは上の一覧に出ます。</p>
       <div class="row" style="margin-top:10px">
@@ -241,7 +241,6 @@ const firebaseConfig={
   messagingSenderId:'39499958848',
   appId:'1:39499958848:web:1a8ba8004dc4611c1cada5'
 };
-const HOME="957596"; // 部の記録帳（市立川崎）
 const LS_LOCAL="doubles-record-local", LS_LAST="doubles-record-last", LS_RECENT="doubles-record-recent", LS_PREFS="doubles-record-prefs";
 // 「自分用」の記録帳（meta.kind="personal"）は呼び名を変える
 const P=()=>S?.meta?.kind==="personal";
@@ -350,10 +349,10 @@ function leave(){
 
 /* ============ 入口 ============ */
 function renderGate(){
-  let r=lsGet(LS_RECENT,[]);
-  if(!r.some(x=>x.code===HOME))r=[...r,{code:HOME,name:"市立川崎"}];
-  r.sort((a,b)=>(b.code===HOME)-(a.code===HOME));
-  $("recent").innerHTML=r.map(x=>`<button data-open="${esc(x.code)}">${x.kind==="personal"?"👤":"🎾"} ${esc(x.name||"記録帳")}<small>${x.kind==="personal"?"自分用":"部"}</small></button>`).join("");
+  const r=lsGet(LS_RECENT,[]);
+  $("openDetails").open=!r.length;
+  $("recent").innerHTML=r.length?"":`<p class="hint" style="margin:0">このスマホで開いた記録帳はまだありません。顧問の先生から聞いた番号を「番号で開く」に入れるか、QRコードを読み取ってください。</p>`;
+  $("recent").innerHTML+=r.map(x=>`<button data-open="${esc(x.code)}">${x.kind==="personal"?"👤":"🎾"} ${esc(x.name||"記録帳")}<small>${x.kind==="personal"?"自分用":"部"}</small></button>`).join("");
   kindHint();
 }
 let newKind="personal";
@@ -810,10 +809,12 @@ $("tab-mem").addEventListener("keydown",e=>{if(e.target.id==="mName"&&e.key==="E
 
 /* ============ 起動 ============ */
 renderGate();
-// 入口の番号入力はとばす：?c=番号 → このスマホで最後に開いた記録帳 → 部の記録帳 の順に開く
+// ?c=番号 → このスマホで最後に開いた記録帳 の順に開く。どちらもなければ「記録帳をえらぶ」
 const qc=new URLSearchParams(location.search).get("c"), last=lsGet(LS_LAST,null);
-if(last==="local")openLocal();
-else openCloud(qc&&/^\d{6}$/.test(qc)?qc:/^\d{6}$/.test(last||"")?last:HOME);
+const start=qc&&/^\d{6}$/.test(qc)?qc:/^\d{6}$/.test(last||"")?last:null;
+if(last==="local"&&!start)openLocal();
+else if(start)openCloud(start);
+else{$("loading").hidden=true;$("gate").hidden=false;renderGate()}
 </script>
 </body>
 </html>
